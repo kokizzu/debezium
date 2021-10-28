@@ -32,6 +32,7 @@ Arik Cohen
 Arkoprabho Chakraborti
 artiship
 Ashhar Hasan
+Ashmeet Lamba
 Attila Szucs
 Aykut Farsak
 Babur Duisenov
@@ -60,6 +61,7 @@ Chris Cranford
 Chris Egerton
 Chris Riccomini
 Christian Posta
+Christopher Burch
 Christopher Sang
 Chuck Ha
 Cliff Wheadon
@@ -81,6 +83,7 @@ Denis Mikhaylov
 Dennis Campagna
 Dennis Persson
 Derek Moore
+Dhrubajyoti G
 Duncan Sands
 Echo Xu
 Ed Laur
@@ -95,11 +98,12 @@ Eric S. Kreiseir
 Erik Malm
 Ewen Cheslack-Postava
 Fabian Aussems
+Fabian Martinez
 Fabio Cantarini
 Fahim Farook
 Faizan
 Fatih Güçlü Akkaya
-Fándly Gergő 
+Fándly Gergő
 Felix Eckhardt
 Fintan Bolton
 Frank Koornstra
@@ -113,9 +117,12 @@ Guillaume Rosauro
 Guillaume Smet
 Gunnar Morling
 Gurnaaz Randhawa
+Guy Korland
 Guy Pascarella
 Grzegorz Kołakowski
 Jan Hendrik Dolling
+Jiabao Sun
+Juan Fiallo
 Hans-Peter Grahsl
 Harvey Yue
 Henryk Konsek
@@ -127,6 +134,7 @@ Hyunjin Oh
 Ian Axelrod
 Igor Gabaydulin
 Ilia Bogdanov
+Indra Shukla
 ismail Simsek
 Ivan Klass
 Ivan Kovbas
@@ -160,11 +168,13 @@ Jon Casstevens
 Jonas Lins
 Jordan Bragg
 Jork Zijlstra
+Jorn Argelo
 Jos Huiting
 Josh Arenberg
 Josh Stanfield
 Joy Gao
 Juan Antonio Pedraza
+Judah Rand
 Jun Du
 Jure Kajzer
 Justin Hiza
@@ -176,6 +186,7 @@ Kevin Pullin
 Kewei Shang
 Krizhan Mariampillai
 Kyley Jex
+Laurent Broudoux
 Leo Mei
 Lev Zemlyanov
 Linh Nguyen Hoang
@@ -238,6 +249,7 @@ Peter Junos
 Peter Larsson
 Peter Urbanetz
 Philip Sanetra
+Plugaru Tudor
 Pradeep Mamillapalli
 Prannoy Mittal
 Preethi Sadagopan
@@ -284,6 +296,7 @@ Stathis Souris
 Stefan Miklosovic
 Stephen Powis
 Steven Siahetiong
+Sungho Hwang
 Syed Muhammad Sufyian
 Tapani Moilanen
 Tautvydas Januskevicius
@@ -310,6 +323,7 @@ Vasily Ulianko
 Vedit Firat Arig
 Victar Malinouski
 Victor Xiang
+Vivek Wassan
 Vladimir Osin
 Wang-Yu-Chao
 WenChao Ke
@@ -317,16 +331,23 @@ Wei Wu
 WenZe Hu
 William Pursell
 Willie Cheong
+Willie Zhu
 Wout Scheepers
 Xiao Fu
+Xiaopu Zhu
 Xuan Shen
 Yang Yang
 yangsanity
 Yilong Chang
 Yiming Liu
 Yoann Rodière
+Yossi Shirizli
+Yuan Zhang
 Zheng Wang
+Zongwen Li
 Zoran Regvart
 志飞 张
-李宗文
 민규 김
+李宗文
+陆杰
+Ünal Sürmeli

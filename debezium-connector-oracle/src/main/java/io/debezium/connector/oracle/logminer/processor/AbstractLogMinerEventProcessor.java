@@ -62,6 +62,8 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
 
     protected final Counters counters;
 
+    private Scn lastProcessedScn = Scn.NULL;
+
     public AbstractLogMinerEventProcessor(ChangeEventSourceContext context,
                                           OracleConnectorConfig connectorConfig,
                                           OracleDatabaseSchema schema,
@@ -127,6 +129,15 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
     }
 
     /**
+     * Return the last processed system change number handled by the processor.
+     *
+     * @return the last processed system change number, never {@code null}.
+     */
+    protected Scn getLastProcessedScn() {
+        return lastProcessedScn;
+    }
+
+    /**
      * Returns the {@code TransactionCache} implementation.
      * @return the transaction cache, never {@code null}
      */
@@ -159,6 +170,9 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
      * @throws InterruptedException if the dispatcher was interrupted sending an event
      */
     protected void processRow(LogMinerEventRow row) throws SQLException, InterruptedException {
+        if (!row.getEventType().equals(EventType.MISSING_SCN)) {
+            lastProcessedScn = row.getScn();
+        }
         switch (row.getEventType()) {
             case MISSING_SCN:
                 handleMissingScn(row);
@@ -209,8 +223,13 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
         final String transactionId = row.getTransactionId();
         final Transaction transaction = getTransactionCache().get(transactionId);
         if (transaction == null && !isRecentlyCommitted(transactionId)) {
-            getTransactionCache().put(transactionId, new Transaction(transactionId, row.getScn(), row.getChangeTime()));
+            Transaction newTransaction = new Transaction(transactionId, row.getScn(), row.getChangeTime(), row.getUserName());
+            getTransactionCache().put(transactionId, newTransaction);
             metrics.setActiveTransactions(getTransactionCache().size());
+        }
+        else if (transaction != null && !isRecentlyCommitted(transactionId)) {
+            LOGGER.trace("Transaction {} is not yet committed and START event detected.", transactionId);
+            transaction.started();
         }
     }
 
@@ -282,16 +301,18 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
             return;
         }
 
-        final LogMinerDmlEntry dmlEntry = selectLobParser.parse(row.getRedoSql(), table);
-        dmlEntry.setObjectName(row.getTableName());
-        dmlEntry.setObjectOwner(row.getTablespaceName());
-
         addToTransaction(row.getTransactionId(),
                 row,
-                () -> new SelectLobLocatorEvent(row,
-                        dmlEntry,
-                        selectLobParser.getColumnName(),
-                        selectLobParser.isBinary()));
+                () -> {
+                    final LogMinerDmlEntry dmlEntry = selectLobParser.parse(row.getRedoSql(), table);
+                    dmlEntry.setObjectName(row.getTableName());
+                    dmlEntry.setObjectOwner(row.getTablespaceName());
+
+                    return new SelectLobLocatorEvent(row,
+                            dmlEntry,
+                            selectLobParser.getColumnName(),
+                            selectLobParser.isBinary());
+                });
 
         metrics.incrementRegisteredDmlCount();
     }
@@ -316,8 +337,7 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
         }
 
         if (row.getRedoSql() != null) {
-            final String lobWriteSql = parseLobWriteSql(row.getRedoSql());
-            addToTransaction(row.getTransactionId(), row, () -> new LobWriteEvent(row, lobWriteSql));
+            addToTransaction(row.getTransactionId(), row, () -> new LobWriteEvent(row, parseLobWriteSql(row.getRedoSql())));
         }
     }
 
@@ -371,13 +391,9 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
                 break;
         }
 
-        final TableId tableId = row.getTableId();
-        Table table = getSchema().tableFor(tableId);
+        final Table table = getTableForDataEvent(row);
         if (table == null) {
-            if (!getConfig().getTableFilters().dataCollectionFilter().isIncluded(tableId)) {
-                return;
-            }
-            table = dispatchSchemaChangeEventAndGetTableForNewCapturedTable(tableId, offsetContext, dispatcher);
+            return;
         }
 
         if (row.isRollbackFlag()) {
@@ -396,11 +412,12 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
             return;
         }
 
-        final LogMinerDmlEntry dmlEntry = parseDmlStatement(row.getRedoSql(), table, row.getTransactionId());
-        dmlEntry.setObjectName(row.getTableName());
-        dmlEntry.setObjectOwner(row.getTablespaceName());
-
-        addToTransaction(row.getTransactionId(), row, () -> new DmlEvent(row, dmlEntry));
+        addToTransaction(row.getTransactionId(), row, () -> {
+            final LogMinerDmlEntry dmlEntry = parseDmlStatement(row.getRedoSql(), table, row.getTransactionId());
+            dmlEntry.setObjectName(row.getTableName());
+            dmlEntry.setObjectOwner(row.getTablespaceName());
+            return new DmlEvent(row, dmlEntry);
+        });
 
         metrics.incrementRegisteredDmlCount();
     }
@@ -432,6 +449,18 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
         }
     }
 
+    private Table getTableForDataEvent(LogMinerEventRow row) throws SQLException, InterruptedException {
+        final TableId tableId = row.getTableId();
+        Table table = getSchema().tableFor(tableId);
+        if (table == null) {
+            if (!getConfig().getTableFilters().dataCollectionFilter().isIncluded(tableId)) {
+                return null;
+            }
+            table = dispatchSchemaChangeEventAndGetTableForNewCapturedTable(tableId, offsetContext, dispatcher);
+        }
+        return table;
+    }
+
     /**
      * Checks whether the result-set has any more data available.
      * When a new row is available, the streaming metrics is updated with the fetch timings.
@@ -460,23 +489,20 @@ public abstract class AbstractLogMinerEventProcessor implements LogMinerEventPro
         if (isTransactionIdAllowed(transactionId)) {
             Transaction transaction = getTransactionCache().get(transactionId);
             if (transaction == null) {
-                LOGGER.trace("Transaction {} not in cache, creating.", transactionId);
-                transaction = new Transaction(transactionId, row.getScn(), row.getChangeTime());
+                LOGGER.trace("Transaction {} not in cache for DML, creating.", transactionId);
+                transaction = new Transaction(transactionId, row.getScn(), row.getChangeTime(), row.getUserName());
                 getTransactionCache().put(transactionId, transaction);
             }
 
-            // The event will only be registered with the transaction if the computed hash value
-            // does not already exist and is not 0. This is necessary to handle overlapping
-            // mining sessions when LOB support is enabled.
-            if (row.getHash() == 0L || !transaction.getHashes().contains(row.getHash())) {
-                if (row.getHash() != 0L) {
-                    transaction.getHashes().add(row.getHash());
-                }
-                LOGGER.trace("Adding {} to transaction {} for table '{}'.", row.getOperation(), transactionId, row.getTableId());
+            int eventId = transaction.getNextEventId();
+            if (transaction.getEvents().size() <= eventId) {
+                // Add new event at eventId offset
+                LOGGER.trace("Transaction {}, adding event reference at index {}", transactionId, eventId);
                 transaction.getEvents().add(eventSupplier.get());
-                metrics.setActiveTransactions(getTransactionCache().size());
                 metrics.calculateLagMetrics(row.getChangeTime());
             }
+
+            metrics.setActiveTransactions(getTransactionCache().size());
         }
     }
 

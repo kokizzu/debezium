@@ -37,7 +37,8 @@ pipeline {
                         --image="${RHEL_IMAGE}"                                     \\
                         --tag="${IMAGE_TAG}"                                        \\
                         --registry="quay.io" --organisation="${QUAY_ORGANISATION}"  \\
-                        --dest-creds="${QUAY_USERNAME}:${QUAY_PASSWORD}"            \\
+                        --dest-login="${QUAY_USERNAME}"                             \\
+                        --dest-pass="${QUAY_PASSWORD}"                              \\
                         --img-output="${WORKSPACE}/published_image_dbz.txt"
                     '''
                 }
@@ -47,7 +48,7 @@ pipeline {
 
     post {
         always {
-            mail to: 'jcechace@redhat.com', subject: "Debezium OpenShift test run #${BUILD_NUMBER} finished", body: """
+            mail to: MAIL_TO, subject: "Debezium OpenShift test run #${BUILD_NUMBER} finished", body: """
 ${currentBuild.projectName} run ${BUILD_URL} finished with result: ${currentBuild.currentResult}
 """
         }
